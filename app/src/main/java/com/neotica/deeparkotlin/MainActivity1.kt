@@ -55,20 +55,19 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
     private var currentEffect = 0
     private val currentFilter = 0// if the device's natural orientation is portrait:
 
-    /*
+/*    *//*
                get interface orientation from
                https://stackoverflow.com/questions/10380989/how-do-i-get-the-current-orientation-activityinfo-screen-orientation-of-an-a/10383164
             */
     private val screenOrientation: Int
-        private get() {
+        get() {
             val rotation = windowManager.defaultDisplay.rotation
             val dm = DisplayMetrics()
             windowManager.defaultDisplay.getMetrics(dm)
             width = dm.widthPixels
             height = dm.heightPixels
-            val orientation: Int
             // if the device's natural orientation is portrait:
-            orientation = if ((rotation == Surface.ROTATION_0
+            val orientation: Int = if ((rotation == Surface.ROTATION_0
                         || rotation == Surface.ROTATION_180) && height > width ||
                 (rotation == Surface.ROTATION_90
                         || rotation == Surface.ROTATION_270) && width > height
@@ -91,7 +90,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             }
             return orientation
         }
-    var effects: ArrayList<String>? = null
+    private var effects: ArrayList<String>? = null
     private var recording = false
     private var currentSwitchRecording = false
     private var width = 0
@@ -136,7 +135,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1 && grantResults.size > 0) {
+        if (requestCode == 1 && grantResults.isNotEmpty()) {
             for (grantResult in grantResults) {
                 if (grantResult != PackageManager.PERMISSION_GRANTED) {
                     return  // no permission
@@ -192,7 +191,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             lensFacing =
                 if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT
             //unbind immediately to avoid mirrored frame.
-            var cameraProvider: ProcessCameraProvider? = null
+            val cameraProvider: ProcessCameraProvider?
             try {
                 cameraProvider = cameraProviderFuture!!.get()
                 cameraProvider.unbindAll()
@@ -243,9 +242,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
                     } else {
                         videoFileName = File(
                             getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-                            "video_" + SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(
-                                Date()
-                            ) + ".mp4"
+                            "video_" + SimpleDateFormat.getDateTimeInstance() + ".mp4"
                         )
                         deepAR!!.startVideoRecording(
                             videoFileName.toString(),
@@ -306,10 +303,10 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle((this as LifecycleOwner), cameraSelector, preview)
             if (surfaceProvider == null) {
-                surfaceProvider = ARSurfaceProvider(this, deepAR)
+                surfaceProvider = deepAR?.let { ARSurfaceProvider(this, it) }
             }
             preview.setSurfaceProvider(surfaceProvider)
-            surfaceProvider!!.isMirror = lensFacing == CameraSelector.LENS_FACING_FRONT
+            surfaceProvider!!.setMirror(lensFacing == CameraSelector.LENS_FACING_FRONT)
         } else {
             val imageAnalysis = ImageAnalysis.Builder()
                 .setTargetResolution(cameraResolution)
@@ -355,7 +352,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             var inputOffset = 0
             while (inputOffset < ySize) {
                 yBuffer.position(inputOffset)
-                yBuffer[byteData, outputOffset, Math.min(yBuffer.remaining(), width)]
+                yBuffer[byteData, outputOffset, yBuffer.remaining().coerceAtMost(width)]
                 outputOffset += width
                 inputOffset += yStride
             }
@@ -368,7 +365,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             var inputOffset = 0
             while (inputOffset < vSize) {
                 vBuffer.position(inputOffset)
-                vBuffer[byteData, outputOffset, Math.min(vBuffer.remaining(), width)]
+                vBuffer[byteData, outputOffset, vBuffer.remaining().coerceAtMost(width)]
                 outputOffset += width
                 inputOffset += vStride
             }
@@ -380,7 +377,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
             var inputOffset = 0
             while (inputOffset < uSize) {
                 uBuffer.position(inputOffset)
-                uBuffer[byteData, outputOffset, Math.min(uBuffer.remaining(), width)]
+                uBuffer[byteData, outputOffset, uBuffer.remaining().coerceAtMost(width)]
                 outputOffset += width
                 inputOffset += uStride
             }
@@ -420,7 +417,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
     override fun onStop() {
         recording = false
         currentSwitchRecording = false
-        var cameraProvider: ProcessCameraProvider? = null
+        val cameraProvider: ProcessCameraProvider?
         try {
             cameraProvider = cameraProviderFuture!!.get()
             cameraProvider.unbindAll()

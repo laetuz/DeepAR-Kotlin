@@ -1,102 +1,109 @@
-package com.neotica.deeparkotlin;
+package com.neotica.deeparkotlin
 
-import android.app.Activity;
-import android.content.Context;
-import android.graphics.SurfaceTexture;
-import android.opengl.EGL14;
-import android.util.Log;
-import android.util.Size;
-import android.view.Surface;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.OptIn;
-import androidx.camera.core.Preview;
-import androidx.camera.core.SurfaceRequest;
-import androidx.core.content.ContextCompat;
-
-import java.util.Timer;
-import java.util.TimerTask;
-
-import ai.deepar.ar.DeepAR;
+import ai.deepar.ar.DeepAR
+import android.content.Context
+import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.util.Log
+import android.view.Surface
+import androidx.annotation.OptIn
+import androidx.camera.core.ExperimentalUseCaseGroup
+import androidx.camera.core.Preview.SurfaceProvider
+import androidx.camera.core.SurfaceRequest
+import androidx.camera.core.SurfaceRequest.TransformationInfo
+import androidx.core.content.ContextCompat
+import java.util.Timer
+import java.util.TimerTask
 
 /**
  * Surface provider used for CameraX preview use-case that provides DeepAR's external GL texture
  * wrapped in SurfaceTexture.
  */
-@OptIn(markerClass = androidx.camera.core.ExperimentalUseCaseGroup.class)
-public class ARSurfaceProvider implements Preview.SurfaceProvider {
-    private static final String tag = ARSurfaceProvider.class.getSimpleName();
-
-    ARSurfaceProvider(Context context, DeepAR deepAR) {
-        this.context = context;
-        this.deepAR = deepAR;
+@OptIn(markerClass = [ExperimentalUseCaseGroup::class])
+class ARSurfaceProvider internal constructor(
+    private val context: Context,
+    private val deepAR: DeepAR
+) : SurfaceProvider {
+    private fun printEglState() {
+        Log.d(
+            tag,
+            "display: " + EGL14.eglGetCurrentDisplay().nativeHandle + ", context: " + EGL14.eglGetCurrentContext().nativeHandle
+        )
     }
 
-    private void printEglState() {
-        Log.d(tag, "display: " + EGL14.eglGetCurrentDisplay().getNativeHandle() + ", context: " + EGL14.eglGetCurrentContext().getNativeHandle());
-    }
-
-    @Override
-    public void onSurfaceRequested(@NonNull SurfaceRequest request) {
-        Log.d(tag, "Surface requested");
-        printEglState();
+    override fun onSurfaceRequested(request: SurfaceRequest) {
+        Log.d(tag, "Surface requested")
+        printEglState()
 
         // request the external gl texture from deepar
-        if(nativeGLTextureHandle == 0) {
-            nativeGLTextureHandle = deepAR.getExternalGlTexture();
-            Log.d(tag, "request new external GL texture");
-            printEglState();
+        if (nativeGLTextureHandle == 0) {
+            nativeGLTextureHandle = deepAR.externalGlTexture
+            Log.d(tag, "request new external GL texture")
+            printEglState()
         }
 
         // if external gl texture could not be provided
-        if(nativeGLTextureHandle == 0) {
-            request.willNotProvideSurface();
-            return;
+        if (nativeGLTextureHandle == 0) {
+            request.willNotProvideSurface()
+            return
         }
 
         // if external GL texture is provided create SurfaceTexture from it
         // and register onFrameAvailable listener to
-        Size resolution = request.getResolution();
-        if(surfaceTexture == null) {
-            surfaceTexture = new SurfaceTexture(nativeGLTextureHandle);
-            surfaceTexture.setOnFrameAvailableListener(__ -> {
-                if(stop) {
-                    return;
+        val resolution = request.resolution
+        if (surfaceTexture == null) {
+            surfaceTexture = SurfaceTexture(nativeGLTextureHandle)
+            surfaceTexture!!.setOnFrameAvailableListener { _: SurfaceTexture? ->
+                if (stop) {
+                    return@setOnFrameAvailableListener
                 }
-                surfaceTexture.updateTexImage();
-                if(isNotifyDeepar) {
-                    deepAR.receiveFrameExternalTexture(resolution.getWidth(), resolution.getHeight(), orientation, mirror, nativeGLTextureHandle);
+                surfaceTexture!!.updateTexImage()
+                if (isNotifyDeepar) {
+                    deepAR.receiveFrameExternalTexture(
+                        resolution.width,
+                        resolution.height,
+                        orientation,
+                        mirror,
+                        nativeGLTextureHandle
+                    )
                 }
-            });
+            }
         }
-        surfaceTexture.setDefaultBufferSize(resolution.getWidth(), resolution.getHeight());
-
-        if(surface == null) {
-            surface = new Surface(surfaceTexture);
+        surfaceTexture!!.setDefaultBufferSize(resolution.width, resolution.height)
+        if (surface == null) {
+            surface = Surface(surfaceTexture)
         }
 
         // register transformation listener to listen for screen orientation changes
-        request.setTransformationInfoListener(ContextCompat.getMainExecutor(context), transformationInfo -> orientation = transformationInfo.getRotationDegrees());
+        request.setTransformationInfoListener(ContextCompat.getMainExecutor(context)) { transformationInfo: TransformationInfo ->
+            orientation = transformationInfo.rotationDegrees
+        }
+        request.provideSurface(
+            surface!!,
+            ContextCompat.getMainExecutor(context)
+        ) { result: SurfaceRequest.Result ->
+            when (result.resultCode) {
+                SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY -> Log.i(
+                    tag, "RESULT_SURFACE_USED_SUCCESSFULLY"
+                )
 
-        request.provideSurface(surface, ContextCompat.getMainExecutor(context), result -> {
-            switch (result.getResultCode()) {
-                case SurfaceRequest.Result.RESULT_SURFACE_USED_SUCCESSFULLY:
-                    Log.i(tag, "RESULT_SURFACE_USED_SUCCESSFULLY");
-                    break;
-                case SurfaceRequest.Result.RESULT_INVALID_SURFACE:
-                    Log.i(tag, "RESULT_INVALID_SURFACE");
-                    break;
-                case SurfaceRequest.Result.RESULT_REQUEST_CANCELLED:
-                    Log.i(tag, "RESULT_REQUEST_CANCELLED");
-                    break;
-                case  SurfaceRequest.Result.RESULT_SURFACE_ALREADY_PROVIDED:
-                    Log.i(tag, "RESULT_SURFACE_ALREADY_PROVIDED");
-                    break;
-                case SurfaceRequest.Result.RESULT_WILL_NOT_PROVIDE_SURFACE:
-                    Log.i(tag, "RESULT_WILL_NOT_PROVIDE_SURFACE");
-                    break;
+                SurfaceRequest.Result.RESULT_INVALID_SURFACE -> Log.i(tag, "RESULT_INVALID_SURFACE")
+                SurfaceRequest.Result.RESULT_REQUEST_CANCELLED -> Log.i(
+                    tag,
+                    "RESULT_REQUEST_CANCELLED"
+                )
+
+                SurfaceRequest.Result.RESULT_SURFACE_ALREADY_PROVIDED -> Log.i(
+                    tag,
+                    "RESULT_SURFACE_ALREADY_PROVIDED"
+                )
+
+                SurfaceRequest.Result.RESULT_WILL_NOT_PROVIDE_SURFACE -> Log.i(
+                    tag,
+                    "RESULT_WILL_NOT_PROVIDE_SURFACE"
+                )
             }
-        });
+        }
     }
 
     /**
@@ -105,8 +112,8 @@ public class ARSurfaceProvider implements Preview.SurfaceProvider {
      *
      * @return mirror flag
      */
-    public boolean isMirror() {
-        return mirror;
+    fun isMirror(): Boolean {
+        return mirror
     }
 
     /**
@@ -115,10 +122,10 @@ public class ARSurfaceProvider implements Preview.SurfaceProvider {
      *
      * @param mirror mirror flag
      */
-    public void setMirror(boolean mirror) {
-        this.mirror = mirror;
-        if(surfaceTexture == null || surface == null) {
-            return;
+    fun setMirror(mirror: Boolean) {
+        this.mirror = mirror
+        if (surfaceTexture == null || surface == null) {
+            return
         }
 
 
@@ -126,33 +133,31 @@ public class ARSurfaceProvider implements Preview.SurfaceProvider {
         // when exactly it will happen so we pause feeding the frames
         // to deepar for 1 second to avoid mirroring image before
         // the camera actually changed
-        isNotifyDeepar = false;
-        new Timer().schedule(new TimerTask() {
-            @Override
-            public void run() {
-                isNotifyDeepar = true;
+        isNotifyDeepar = false
+        Timer().schedule(object : TimerTask() {
+            override fun run() {
+                isNotifyDeepar = true
             }
-        }, 1000);
+        }, 1000)
     }
 
     /**
      * Tell the surface provider to stop feeding frames to DeepAR.
-     * Should be called in {@link Activity#onDestroy()} ()}.
+     * Should be called in [Activity.onDestroy] ()}.
      */
-    public void stop() {
-        stop = true;
+    fun stop() {
+        stop = true
     }
 
-    private boolean isNotifyDeepar = true;
-    private boolean stop = false;
-    private boolean mirror = true;
-    private int orientation = 0;
+    private var isNotifyDeepar = true
+    private var stop = false
+    private var mirror = true
+    private var orientation = 0
+    private var surfaceTexture: SurfaceTexture? = null
+    private var surface: Surface? = null
+    private var nativeGLTextureHandle = 0
 
-    private SurfaceTexture surfaceTexture;
-    private Surface surface;
-    private int nativeGLTextureHandle = 0;
-
-    private final DeepAR deepAR;
-    private final Context context;
+    companion object {
+        private val tag = ARSurfaceProvider::class.java.simpleName
+    }
 }
-
