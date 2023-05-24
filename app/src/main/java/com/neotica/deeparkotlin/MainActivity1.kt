@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.text.format.DateFormat
 import android.util.DisplayMetrics
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.SurfaceHolder
@@ -33,8 +34,14 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.text.SimpleDateFormat
@@ -55,7 +62,7 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
     private var currentEffect = 0
     private val currentFilter = 0// if the device's natural orientation is portrait:
 
-/*    *//*
+    /*    *//*
                get interface orientation from
                https://stackoverflow.com/questions/10380989/how-do-i-get-the-current-orientation-activityinfo-screen-orientation-of-an-a/10383164
             */
@@ -151,29 +158,47 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
         initalizeViews()
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun initializeFilters() {
         effects = ArrayList()
         effects!!.add("none")
-        effects!!.add("kacamata.deepar")
-        effects!!.add("https://storage.googleapis.com/deepar-sample/kacamata.deepar")
-        effects!!.add("MakeupLook.deepar")
-        effects!!.add("Split_View_Look.deepar")
-        effects!!.add("Emotions_Exaggerator.deepar")
-        effects!!.add("Emotion_Meter.deepar")
-        effects!!.add("Stallone.deepar")
-        effects!!.add("flower_face.deepar")
-        effects!!.add("galaxy_background.deepar")
-        effects!!.add("Humanoid.deepar")
-        effects!!.add("Neon_Devil_Horns.deepar")
-        effects!!.add("Ping_Pong.deepar")
-        effects!!.add("Pixel_Hearts.deepar")
-        effects!!.add("Snail.deepar")
-        effects!!.add("Hope.deepar")
-        effects!!.add("Vendetta_Mask.deepar")
         effects!!.add("Fire_Effect.deepar")
-        effects!!.add("burning_effect.deepar")
-        effects!!.add("Elephant_Trunk.deepar")
+        effects!!.add("kacamataa.deepar")
+        effects!!.add("https://storage.googleapis.com/deepar-sample/kacamata.deepar")
+
+        // Download and save the effect file from the URL
+        /*GlobalScope.launch(Dispatchers.IO) {
+            Log.d("neo-kaca", "initializeFilters: entering coroutine")
+            val effectUrl = "https://storage.googleapis.com/deepar-sample/kacamata.deepar"
+            val effectFileName = "kacamataa.deepar"
+
+            val effectFile = File(getExternalFilesDir(null), effectFileName)
+            val url = URL(effectUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+            connection.connect()
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val inputStream = connection.inputStream
+                val outputStream = FileOutputStream(effectFile)
+                val buffer = ByteArray(1024)
+                var bytesRead: Int
+                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    outputStream.write(buffer, 0, bytesRead)
+                }
+                outputStream.close()
+                inputStream.close()
+
+                // Add the local file path to the effects list
+                Log.d("neo-kaca","Success saved.")
+                effects!!.add(effectFile.absolutePath)
+            }
+        }*/
+
     }
+
 
     private fun initalizeViews() {
         val previousMask = findViewById<ImageButton>(R.id.previousMask)
