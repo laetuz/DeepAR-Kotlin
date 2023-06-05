@@ -32,6 +32,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -155,24 +156,21 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
     private fun initialize() {
         initializeDeepAR()
         initializeFilters()
-        initalizeViews()
+        initializeViews()
     }
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun initializeFilters() {
         effects = ArrayList()
-        effects!!.add("none")
-        effects!!.add("Fire_Effect.deepar")
         effects!!.add("kacamataa.deepar")
-        effects!!.add("https://storage.googleapis.com/deepar-sample/kacamata.deepar")
 
         // Download and save the effect file from the URL
-        /*GlobalScope.launch(Dispatchers.IO) {
+        GlobalScope.launch(Dispatchers.IO) {
             Log.d("neo-kaca", "initializeFilters: entering coroutine")
-            val effectUrl = "https://storage.googleapis.com/deepar-sample/kacamata.deepar"
+            val effectUrl = "https://storage.googleapis.com/arvigo-bucket/object/sample.deepar"
             val effectFileName = "kacamataa.deepar"
 
-            val effectFile = File(getExternalFilesDir(null), effectFileName)
+            val effectFile = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), effectFileName)
             val url = URL(effectUrl)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
@@ -193,14 +191,22 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
 
                 // Add the local file path to the effects list
                 Log.d("neo-kaca","Success saved.")
-                effects!!.add(effectFile.absolutePath)
+                Log.d("neo-kaca", effectFile.absolutePath.toString())
+                val fileUri = FileProvider.getUriForFile(
+                    applicationContext, applicationContext.packageName.toString(), File(effectFile.absolutePath)
+                )
+                fileUri.path?.let {
+                    effects!!.add(it)
+                    Log.d("neo-kaca", "Masuk let")
+                }
+                Log.d("neo-kaca", "${fileUri.path}")
             }
-        }*/
+        }
 
     }
 
 
-    private fun initalizeViews() {
+    private fun initializeViews() {
         val previousMask = findViewById<ImageButton>(R.id.previousMask)
         val nextMask = findViewById<ImageButton>(R.id.nextMask)
         val arView = findViewById<SurfaceView>(R.id.surface)
@@ -226,61 +232,6 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
                 e.printStackTrace()
             }
             setupCamera()
-        }
-        val openActivity = findViewById<ImageButton>(R.id.openActivity)
-        openActivity.setOnClickListener {
-            val myIntent = Intent(this@MainActivity1, BasicActivity::class.java)
-            this@MainActivity1.startActivity(myIntent)
-        }
-        val screenShotModeButton = findViewById<TextView>(R.id.screenshotModeButton)
-        val recordModeBtn = findViewById<TextView>(R.id.recordModeButton)
-        recordModeBtn.background.alpha = 0x00
-        screenShotModeButton.background.alpha = 0xA0
-        screenShotModeButton.setOnClickListener(View.OnClickListener {
-            if (currentSwitchRecording) {
-                if (recording) {
-                    Toast.makeText(
-                        applicationContext,
-                        "Cannot switch to screenshots while recording!",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@OnClickListener
-                }
-                recordModeBtn.background.alpha = 0x00
-                screenShotModeButton.background.alpha = 0xA0
-                screenshotBtn.setOnClickListener { deepAR!!.takeScreenshot() }
-                currentSwitchRecording = !currentSwitchRecording
-            }
-        })
-        recordModeBtn.setOnClickListener {
-            if (!currentSwitchRecording) {
-                recordModeBtn.background.alpha = 0xA0
-                screenShotModeButton.background.alpha = 0x00
-                screenshotBtn.setOnClickListener {
-                    if (recording) {
-                        deepAR!!.stopVideoRecording()
-                        Toast.makeText(
-                            applicationContext,
-                            "Recording " + videoFileName!!.name + " saved.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        videoFileName = File(
-                            getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-                            "video_" + SimpleDateFormat.getDateTimeInstance() + ".mp4"
-                        )
-                        deepAR!!.startVideoRecording(
-                            videoFileName.toString(),
-                            width / 2,
-                            height / 2
-                        )
-                        Toast.makeText(applicationContext, "Recording started.", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                    recording = !recording
-                }
-                currentSwitchRecording = !currentSwitchRecording
-            }
         }
         previousMask.setOnClickListener { gotoPrevious() }
         nextMask.setOnClickListener { gotoNext() }
@@ -424,19 +375,26 @@ class MainActivity1 : AppCompatActivity(), SurfaceHolder.Callback, AREventListen
     }
 
     private fun getFilterPath(filterName: String): String? {
+        val effectFile = Environment.DIRECTORY_DOWNLOADS
+        val file = File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), filterName).absolutePath
         return if (filterName == "none") {
             null
-        } else "file:///android_asset/$filterName"
+        } else
+            file
+            //"$effectFile/$filterName"
+            //"file:///android_asset/$filterName"
     }
 
     private fun gotoNext() {
         currentEffect = (currentEffect + 1) % effects!!.size
         deepAR!!.switchEffect("effect", getFilterPath(effects!![currentEffect]))
+        Log.d("neo-kaca", "gotoNext: ${getFilterPath(effects!![currentEffect])}")
     }
 
     private fun gotoPrevious() {
         currentEffect = (currentEffect - 1 + effects!!.size) % effects!!.size
         deepAR!!.switchEffect("effect", getFilterPath(effects!![currentEffect]))
+        Log.d("neo-kaca", "gotoPrev: ${getFilterPath(effects!![currentEffect])}")
     }
 
     override fun onStop() {

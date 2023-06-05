@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-path
+        name="external_files"
+        path="." />
+
+    <external-files-path
+        name="picture"
+        path="Pictures/" />
+    <external-path
+        name="media"
+        path="." />
+    <external-path
+        name="attachment_file"
+        path="."/>
+    <root-path
+        name="external_files"
+        path="/storage/" />
+</paths>
